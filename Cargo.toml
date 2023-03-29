@@ -1,0 +1,14 @@
+[package]
+name = "pong"
+version = "0.1.0"
+edition = "2021"
+
+[profile.dev]
+opt-level = 1
+
+[dependencies]
+vulkano = "0.32.3"
+vulkano-win = "0.32.0"
+winit = "0.27"
+bytemuck = "1.13.1"
+vulkano-shaders = "0.32.0"
