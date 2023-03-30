@@ -41,7 +41,6 @@ use winit::{
 mod initialization;
 
 pub struct Renderer{
-    instance: Arc<Instance>,
     device: Arc<Device>,
     render_surface: Arc<Surface>,
     swapchain_container: SwapchainContainer,
@@ -270,7 +269,6 @@ pub fn initialize_renderer(event_loop:&EventLoop<()>) -> Renderer
     let previous_frame_end = Some(sync::now(device.clone()).boxed());
 
     return Renderer{
-        instance: instance.clone(),
         device: device.clone(),
         render_surface: surface.clone(),
         swapchain_container: swapchain_container,
