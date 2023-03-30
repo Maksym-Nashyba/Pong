@@ -1,5 +1,6 @@
-use bytemuck::{Pod, Zeroable};
 use std::sync::Arc;
+
+use bytemuck::{Pod, Zeroable};
 use vulkano::{
     buffer::{BufferUsage, CpuAccessibleBuffer, TypedBufferAccess},
     command_buffer::{
@@ -7,9 +8,9 @@ use vulkano::{
         RenderPassBeginInfo, SubpassContents,
     },
     device::{
-        physical::PhysicalDeviceType, Device, DeviceCreateInfo, DeviceExtensions, QueueCreateInfo,
+        Device, DeviceCreateInfo, DeviceExtensions, physical::PhysicalDeviceType, QueueCreateInfo,
     },
-    image::{view::ImageView, ImageAccess, ImageUsage, SwapchainImage},
+    image::{ImageAccess, ImageUsage, SwapchainImage, view::ImageView},
     impl_vertex,
     instance::{Instance, InstanceCreateInfo},
     memory::allocator::StandardMemoryAllocator,
@@ -33,8 +34,7 @@ use vulkano::device::Queue;
 use vulkano::swapchain::Surface;
 use vulkano_win::VkSurfaceBuild;
 use winit::{
-    event::{Event, WindowEvent},
-    event_loop::{ControlFlow, EventLoop},
+    event_loop::EventLoop,
     window::{Window, WindowBuilder},
 };
 
@@ -48,7 +48,11 @@ pub struct Renderer{
     render_pass: Arc<RenderPass>,
     pipeline: Arc<GraphicsPipeline>,
     queue: Arc<Queue>,
-    vertex_buffer: Arc<CpuAccessibleBuffer<[MyVertex]>>
+    vertex_buffer: Arc<CpuAccessibleBuffer<[MyVertex]>>,
+    viewport: Viewport,
+    framebuffers: Vec<Arc<Framebuffer>>,
+    command_buffer_allocator: StandardCommandBufferAllocator,
+    previous_frame_end: Option<Box<dyn GpuFuture>>
 }
 
 struct SwapchainContainer{
@@ -252,6 +256,19 @@ pub fn initialize_renderer(event_loop:&EventLoop<()>) -> Renderer
         optimal: true
     };
 
+    let mut viewport = Viewport {
+        origin: [0.0, 0.0],
+        dimensions: [0.0, 0.0],
+        depth_range: 0.0..1.0,
+    };
+
+    let framebuffers: Vec<Arc<Framebuffer>> = window_size_dependent_setup(&swapchain_container.images, render_pass.clone(), &mut viewport);
+
+    let command_buffer_allocator =
+        StandardCommandBufferAllocator::new(device.clone(), Default::default());
+
+    let previous_frame_end = Some(sync::now(device.clone()).boxed());
+
     return Renderer{
         instance: instance.clone(),
         device: device.clone(),
@@ -260,7 +277,11 @@ pub fn initialize_renderer(event_loop:&EventLoop<()>) -> Renderer
         render_pass: render_pass.clone(),
         pipeline: pipeline.clone(),
         queue: queue.clone(),
-        vertex_buffer: vertex_buffer.clone()
+        vertex_buffer: vertex_buffer.clone(),
+        viewport: viewport,
+        framebuffers: framebuffers,
+        command_buffer_allocator: command_buffer_allocator,
+        previous_frame_end: previous_frame_end
     }
 }
 
@@ -270,28 +291,13 @@ impl Renderer{
     }
 
     pub fn submit_draw(&mut self){
-        let mut viewport = Viewport {
-            origin: [0.0, 0.0],
-            dimensions: [0.0, 0.0],
-            depth_range: 0.0..1.0,
-        };
-
-        let mut framebuffers: Vec<Arc<Framebuffer>> = window_size_dependent_setup(&self.swapchain_container.images, self.render_pass.clone(), &mut viewport);
-
-        let command_buffer_allocator =
-            StandardCommandBufferAllocator::new(self.device.clone(), Default::default());
-
-        let mut previous_frame_end = Some(sync::now(self.device.clone()).boxed());
-
-        //Loop starts here//
-
         let window = self.render_surface.object().unwrap().downcast_ref::<Window>().unwrap();
         let dimensions = window.inner_size();
         if dimensions.width == 0 || dimensions.height == 0 {
             return;
         }
 
-        previous_frame_end.as_mut().unwrap().cleanup_finished();
+        self.previous_frame_end.as_mut().unwrap().cleanup_finished();
 
         if !self.swapchain_container.optimal {
             let (new_swapchain, new_images) =
@@ -310,10 +316,10 @@ impl Renderer{
                 optimal: true
             };
 
-            framebuffers = window_size_dependent_setup(
+            self.framebuffers = window_size_dependent_setup(
                 &new_images,
                 self.render_pass.clone(),
-                &mut viewport,
+                &mut self.viewport,
             );
         }
 
@@ -332,7 +338,7 @@ impl Renderer{
         }
 
         let mut builder = AutoCommandBufferBuilder::primary(
-            &command_buffer_allocator,
+            &self.command_buffer_allocator,
             self.queue.queue_family_index(),
             CommandBufferUsage::OneTimeSubmit,
         ).unwrap();
@@ -342,13 +348,13 @@ impl Renderer{
                 RenderPassBeginInfo {
                     clear_values: vec![Some([0.0, 0.0, 1.0, 1.0].into())],
                     ..RenderPassBeginInfo::framebuffer(
-                        framebuffers[image_index as usize].clone(),
+                        self.framebuffers[image_index as usize].clone(),
                     )
                 },
                 SubpassContents::Inline,
             )
             .unwrap()
-            .set_viewport(0, [viewport.clone()])
+            .set_viewport(0, [self.viewport.clone()])
             .bind_pipeline_graphics(self.pipeline.clone())
             .bind_vertex_buffers(0, self.vertex_buffer.clone())
             .draw(self.vertex_buffer.len() as u32, 1, 0, 0)
@@ -358,7 +364,7 @@ impl Renderer{
 
         let command_buffer = builder.build().unwrap();
 
-        let future = previous_frame_end
+        let future = self.previous_frame_end
             .take()
             .unwrap()
             .join(acquire_future)
@@ -371,11 +377,11 @@ impl Renderer{
 
         match future {
             Ok(future) => {
-                previous_frame_end = Some(future.boxed());
+                self.previous_frame_end = Some(future.boxed());
             }
             Err(FlushError::OutOfDate) => {
                 self.swapchain_container.optimal = false;
-                previous_frame_end = Some(sync::now(self.device.clone()).boxed());
+                self.previous_frame_end = Some(sync::now(self.device.clone()).boxed());
             }
             Err(e) => {
                 panic!("Failed to flush future: {:?}", e);
