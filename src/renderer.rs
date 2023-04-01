@@ -1,3 +1,5 @@
+mod shader_loader;
+
 use std::sync::Arc;
 
 use bytemuck::{Pod, Zeroable};
@@ -37,8 +39,7 @@ use winit::{
     event_loop::EventLoop,
     window::{Window, WindowBuilder},
 };
-
-mod initialization;
+use crate::renderer::shader_loader::{ShaderContainer, ShaderType};
 
 pub struct Renderer{
     device: Arc<Device>,
@@ -190,40 +191,9 @@ pub fn initialize_renderer(event_loop:&EventLoop<()>) -> Renderer
         vertices,
     ).unwrap();
 
-    mod vs {
-        vulkano_shaders::shader! {
-        ty: "vertex",
-        src: "
-            #version 450
+    let shader_container: ShaderContainer = ShaderContainer::load(device.clone()).unwrap();
 
-            layout(location = 0) in vec2 position;
-
-            void main() {
-                gl_Position = vec4(position, 0.0, 1.0);
-            }
-        "
-    }
-    }
-
-    mod fs {
-        vulkano_shaders::shader! {
-        ty: "fragment",
-        src: "
-            #version 450
-
-            layout(location = 0) out vec4 f_color;
-
-            void main() {
-                f_color = vec4(1.0, 0.0, 0.0, 1.0);
-            }
-        "
-    }
-    }
-
-    let vs = vs::load(device.clone()).unwrap();
-    let fs = fs::load(device.clone()).unwrap();
-
-    let render_pass = vulkano::single_pass_renderpass!(
+    let render_pass: Arc<RenderPass> = vulkano::single_pass_renderpass!(
     device.clone(),
     attachments: {
         color: {
@@ -243,9 +213,11 @@ pub fn initialize_renderer(event_loop:&EventLoop<()>) -> Renderer
         .render_pass(Subpass::from(render_pass.clone(), 0).unwrap())
         .vertex_input_state(BuffersDefinition::new().vertex::<MyVertex>())
         .input_assembly_state(InputAssemblyState::new())
-        .vertex_shader(vs.entry_point("main").unwrap(), ())
+        .vertex_shader(shader_container.get_shader(ShaderType::Vertex, "direct").unwrap()
+                           .entry_point("main").unwrap(), ())
+        .fragment_shader(shader_container.get_shader(ShaderType::Fragment, "direct").unwrap()
+                             .entry_point("main").unwrap(), ())
         .viewport_state(ViewportState::viewport_dynamic_scissor_irrelevant())
-        .fragment_shader(fs.entry_point("main").unwrap(), ())
         .build(device.clone()).unwrap();
 
     let swapchain_container: SwapchainContainer =
