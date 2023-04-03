@@ -39,13 +39,13 @@ impl ShaderContainer{
         loaded_shaders.push(LoadedShader{
             name:String::from("direct"),
             shader_type:ShaderType::Vertex,
-            shader: direct_vert::load(device.clone()).unwrap()
+            shader: direct_vert::load(device.clone())?
         });
 
         loaded_shaders.push(LoadedShader{
             name:String::from("direct"),
             shader_type:ShaderType::Fragment,
-            shader: direct_frag::load(device.clone()).unwrap()
+            shader: direct_frag::load(device.clone())?
         });
 
         return Ok(ShaderContainer{

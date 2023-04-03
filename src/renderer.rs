@@ -1,10 +1,10 @@
 mod shader_loader;
+mod model;
 
 use std::sync::Arc;
 
-use bytemuck::{Pod, Zeroable};
 use vulkano::{
-    buffer::{BufferUsage, CpuAccessibleBuffer, TypedBufferAccess},
+    buffer::{CpuAccessibleBuffer, TypedBufferAccess},
     command_buffer::{
         allocator::StandardCommandBufferAllocator, AutoCommandBufferBuilder, CommandBufferUsage,
         RenderPassBeginInfo, SubpassContents,
@@ -13,7 +13,6 @@ use vulkano::{
         Device, DeviceCreateInfo, DeviceExtensions, physical::PhysicalDeviceType, QueueCreateInfo,
     },
     image::{ImageAccess, ImageUsage, SwapchainImage, view::ImageView},
-    impl_vertex,
     instance::{Instance, InstanceCreateInfo},
     memory::allocator::StandardMemoryAllocator,
     pipeline::{
@@ -39,6 +38,7 @@ use winit::{
     event_loop::EventLoop,
     window::{Window, WindowBuilder},
 };
+use crate::renderer::model::{Model, Vertex};
 use crate::renderer::shader_loader::{ShaderContainer, ShaderType};
 
 pub struct Renderer{
@@ -48,7 +48,7 @@ pub struct Renderer{
     render_pass: Arc<RenderPass>,
     pipeline: Arc<GraphicsPipeline>,
     queue: Arc<Queue>,
-    vertex_buffer: Arc<CpuAccessibleBuffer<[MyVertex]>>,
+    vertex_buffer: Arc<CpuAccessibleBuffer<[Vertex]>>,
     viewport: Viewport,
     framebuffers: Vec<Arc<Framebuffer>>,
     command_buffer_allocator: StandardCommandBufferAllocator,
@@ -59,12 +59,6 @@ struct SwapchainContainer{
     pub swapchain: Arc<Swapchain>,
     pub images: Vec<Arc<SwapchainImage>>,
     pub optimal: bool
-}
-
-#[repr(C)]
-#[derive(Clone, Copy, Debug, Default, Zeroable, Pod)]
-struct MyVertex {
-    position: [f32; 2],
 }
 
 pub fn initialize_renderer(event_loop:&EventLoop<()>) -> Renderer
@@ -91,8 +85,7 @@ pub fn initialize_renderer(event_loop:&EventLoop<()>) -> Renderer
     };
 
     let (physical_device, queue_family_index) = instance
-        .enumerate_physical_devices()
-        .unwrap()
+        .enumerate_physical_devices().unwrap()
         .filter(|p| {
             p.supported_extensions().contains(&device_extensions)
         })
@@ -114,8 +107,7 @@ pub fn initialize_renderer(event_loop:&EventLoop<()>) -> Renderer
                 PhysicalDeviceType::Other => 4,
                 _ => 5,
             }
-        })
-        .expect("No suitable physical device found");
+        }).expect("No suitable physical device found");
 
     let (device, mut queues) = Device::new(
         physical_device,
@@ -129,7 +121,7 @@ pub fn initialize_renderer(event_loop:&EventLoop<()>) -> Renderer
         },
     ).unwrap();
 
-    let queue = queues.next().unwrap();
+    let queue: Arc<Queue> = queues.next().unwrap();
 
     let (swapchain, images) = {
         let surface_capabilities = device
@@ -144,6 +136,7 @@ pub fn initialize_renderer(event_loop:&EventLoop<()>) -> Renderer
                 .unwrap()[0]
                 .0,
         );
+
         let window = surface.object().unwrap().downcast_ref::<Window>().unwrap();
 
         Swapchain::new(
@@ -166,30 +159,20 @@ pub fn initialize_renderer(event_loop:&EventLoop<()>) -> Renderer
         ).unwrap()
     };
 
-    let memory_allocator = StandardMemoryAllocator::new_default(device.clone());
+    let memory_allocator: StandardMemoryAllocator = StandardMemoryAllocator::new_default(device.clone());
 
-    impl_vertex!(MyVertex, position);
-
-    let vertices = [
-        MyVertex {
-            position: [-0.5, -0.25],
+    let vertices = vec![
+        Vertex {
+            position: [-0.5, -0.25, 0.5],
         },
-        MyVertex {
-            position: [0.0, 0.5],
+        Vertex {
+            position: [0.0, 0.5, 0.5],
         },
-        MyVertex {
-            position: [0.25, -0.1],
+        Vertex {
+            position: [0.25, -0.1, 0.5],
         },
     ];
-    let vertex_buffer: Arc<CpuAccessibleBuffer<[MyVertex]>> = CpuAccessibleBuffer::from_iter(
-        &memory_allocator,
-        BufferUsage {
-            vertex_buffer: true,
-            ..BufferUsage::empty()
-        },
-        false,
-        vertices,
-    ).unwrap();
+    let vertex_buffer= Model::load(&memory_allocator, vertices).buffer;
 
     let shader_container: ShaderContainer = ShaderContainer::load(device.clone()).unwrap();
 
@@ -211,7 +194,7 @@ pub fn initialize_renderer(event_loop:&EventLoop<()>) -> Renderer
     let pipeline: Arc<GraphicsPipeline> =
         GraphicsPipeline::start()
         .render_pass(Subpass::from(render_pass.clone(), 0).unwrap())
-        .vertex_input_state(BuffersDefinition::new().vertex::<MyVertex>())
+        .vertex_input_state(BuffersDefinition::new().vertex::<Vertex>())
         .input_assembly_state(InputAssemblyState::new())
         .vertex_shader(shader_container.get_shader(ShaderType::Vertex, "direct").unwrap()
                            .entry_point("main").unwrap(), ())
