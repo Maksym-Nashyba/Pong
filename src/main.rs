@@ -3,6 +3,7 @@ use winit::event_loop::{ControlFlow, EventLoop};
 use crate::renderer::Renderer;
 
 mod renderer;
+mod transform;
 
 fn main() {
     let event_loop:EventLoop<()> = EventLoop::new();

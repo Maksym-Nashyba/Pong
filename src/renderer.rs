@@ -1,5 +1,7 @@
 mod shader_loader;
 mod model;
+mod material;
+mod draw_call;
 
 use std::sync::Arc;
 

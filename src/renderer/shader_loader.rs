@@ -6,12 +6,13 @@ pub struct ShaderContainer{
     shaders: Vec<LoadedShader>
 }
 
-#[derive(PartialEq, Eq)]
+#[derive(PartialEq, Eq, Clone)]
 pub enum ShaderType{
     Vertex,
     Fragment
 }
 
+#[derive(Clone)]
 struct LoadedShader{
     shader:Arc<ShaderModule>,
     shader_type: ShaderType,

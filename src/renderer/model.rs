@@ -1,7 +1,7 @@
 use std::sync::Arc;
 use vulkano::buffer::{BufferUsage, CpuAccessibleBuffer};
 use vulkano::impl_vertex;
-use vulkano::memory::allocator::{FreeListAllocator, GenericMemoryAllocator, MemoryAllocator, StandardMemoryAllocator};
+use vulkano::memory::allocator::StandardMemoryAllocator;
 use bytemuck::{Pod, Zeroable};
 
 #[repr(C)]
@@ -12,6 +12,7 @@ pub struct Vertex{
 
 impl_vertex!(Vertex, position);
 
+#[derive(Clone)]
 pub struct Model{
     pub buffer: Arc<CpuAccessibleBuffer<[Vertex]>>
 }
