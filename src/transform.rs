@@ -1,5 +1,6 @@
 use nalgebra_glm::{Quat, Vec3};
 
+#[derive(Clone)]
 pub struct Transform{
     pub position:Vec3,
     pub rotation:Quat,
@@ -15,9 +16,9 @@ impl Transform {
         }
     }
 
-    pub fn at_position(position: &Vec3) -> Transform{
+    pub fn at_position(position: Vec3) -> Transform{
         return Transform{
-            position: *position,
+            position: position,
             rotation:Quat::identity(),
             scale:Vec3::identity()
         }

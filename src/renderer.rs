@@ -1,7 +1,7 @@
-mod shader_loader;
-mod model;
-mod material;
-mod draw_call;
+pub(crate) mod shader_loader;
+pub(crate) mod model;
+pub(crate) mod material;
+pub(crate) mod draw_call;
 
 use std::sync::Arc;
 
@@ -40,17 +40,18 @@ use winit::{
     event_loop::EventLoop,
     window::{Window, WindowBuilder},
 };
+use crate::renderer::draw_call::DrawCall;
 use crate::renderer::model::{Model, Vertex};
 use crate::renderer::shader_loader::{ShaderContainer, ShaderType};
 
 pub struct Renderer{
-    device: Arc<Device>,
+    pub device: Arc<Device>,
+    pub shader_container: ShaderContainer,
     render_surface: Arc<Surface>,
     swapchain_container: SwapchainContainer,
     render_pass: Arc<RenderPass>,
     pipeline: Arc<GraphicsPipeline>,
     queue: Arc<Queue>,
-    vertex_buffer: Arc<CpuAccessibleBuffer<[Vertex]>>,
     viewport: Viewport,
     framebuffers: Vec<Arc<Framebuffer>>,
     command_buffer_allocator: StandardCommandBufferAllocator,
@@ -161,21 +162,6 @@ pub fn initialize_renderer(event_loop:&EventLoop<()>) -> Renderer
         ).unwrap()
     };
 
-    let memory_allocator: StandardMemoryAllocator = StandardMemoryAllocator::new_default(device.clone());
-
-    let vertices = vec![
-        Vertex {
-            position: [-0.5, -0.25, 0.5],
-        },
-        Vertex {
-            position: [0.0, 0.5, 0.5],
-        },
-        Vertex {
-            position: [0.25, -0.1, 0.5],
-        },
-    ];
-    let vertex_buffer= Model::load(&memory_allocator, vertices).buffer;
-
     let shader_container: ShaderContainer = ShaderContainer::load(device.clone()).unwrap();
 
     let render_pass: Arc<RenderPass> = vulkano::single_pass_renderpass!(
@@ -227,12 +213,12 @@ pub fn initialize_renderer(event_loop:&EventLoop<()>) -> Renderer
 
     return Renderer{
         device: device.clone(),
+        shader_container: shader_container,
         render_surface: surface.clone(),
         swapchain_container: swapchain_container,
         render_pass: render_pass.clone(),
         pipeline: pipeline.clone(),
         queue: queue.clone(),
-        vertex_buffer: vertex_buffer.clone(),
         viewport: viewport,
         framebuffers: framebuffers,
         command_buffer_allocator: command_buffer_allocator,
@@ -245,7 +231,7 @@ impl Renderer{
         self.swapchain_container.optimal = false;
     }
 
-    pub fn submit_draw(&mut self){
+    pub fn submit_draw(&mut self, draw_calls:Vec<DrawCall>){
         let window = self.render_surface.object().unwrap().downcast_ref::<Window>().unwrap();
         let dimensions = window.inner_size();
         if dimensions.width == 0 || dimensions.height == 0 {
@@ -311,8 +297,8 @@ impl Renderer{
             .unwrap()
             .set_viewport(0, [self.viewport.clone()])
             .bind_pipeline_graphics(self.pipeline.clone())
-            .bind_vertex_buffers(0, self.vertex_buffer.clone())
-            .draw(self.vertex_buffer.len() as u32, 1, 0, 0)
+            .bind_vertex_buffers(0, draw_calls.first().unwrap().model.buffer.clone())
+            .draw(draw_calls.first().unwrap().model.buffer.len() as u32, 1, 0, 0)
             .unwrap()
             .end_render_pass()
             .unwrap();
