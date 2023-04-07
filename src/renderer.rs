@@ -1,6 +1,5 @@
 pub(crate) mod shader_loader;
 pub(crate) mod model;
-pub(crate) mod material;
 pub(crate) mod draw_call;
 
 use std::sync::Arc;
@@ -33,8 +32,10 @@ use vulkano::{
     sync::{self, FlushError, GpuFuture},
     VulkanLibrary,
 };
+use vulkano::command_buffer::PrimaryAutoCommandBuffer;
 use vulkano::device::Queue;
-use vulkano::swapchain::Surface;
+use vulkano::shader::ShaderModule;
+use vulkano::swapchain::{Surface, SwapchainAcquireFuture};
 use vulkano_win::VkSurfaceBuild;
 use winit::{
     event_loop::EventLoop,
@@ -50,7 +51,6 @@ pub struct Renderer{
     render_surface: Arc<Surface>,
     swapchain_container: SwapchainContainer,
     render_pass: Arc<RenderPass>,
-    pipeline: Arc<GraphicsPipeline>,
     queue: Arc<Queue>,
     viewport: Viewport,
     framebuffers: Vec<Arc<Framebuffer>>,
@@ -179,18 +179,6 @@ pub fn initialize_renderer(event_loop:&EventLoop<()>) -> Renderer
         depth_stencil: {}
     }).unwrap();
 
-    let pipeline: Arc<GraphicsPipeline> =
-        GraphicsPipeline::start()
-        .render_pass(Subpass::from(render_pass.clone(), 0).unwrap())
-        .vertex_input_state(BuffersDefinition::new().vertex::<Vertex>())
-        .input_assembly_state(InputAssemblyState::new())
-        .vertex_shader(shader_container.get_shader(ShaderType::Vertex, "direct").unwrap()
-                           .entry_point("main").unwrap(), ())
-        .fragment_shader(shader_container.get_shader(ShaderType::Fragment, "direct").unwrap()
-                             .entry_point("main").unwrap(), ())
-        .viewport_state(ViewportState::viewport_dynamic_scissor_irrelevant())
-        .build(device.clone()).unwrap();
-
     let swapchain_container: SwapchainContainer =
         SwapchainContainer{
         swapchain: swapchain.clone(),
@@ -217,7 +205,6 @@ pub fn initialize_renderer(event_loop:&EventLoop<()>) -> Renderer
         render_surface: surface.clone(),
         swapchain_container: swapchain_container,
         render_pass: render_pass.clone(),
-        pipeline: pipeline.clone(),
         queue: queue.clone(),
         viewport: viewport,
         framebuffers: framebuffers,
@@ -295,17 +282,31 @@ impl Renderer{
                 SubpassContents::Inline,
             )
             .unwrap()
-            .set_viewport(0, [self.viewport.clone()])
-            .bind_pipeline_graphics(self.pipeline.clone());
+            .set_viewport(0, [self.viewport.clone()]);
         for draw_call in draw_calls {
             builder
+                .bind_pipeline_graphics(draw_call.material.pipeline())
                 .bind_vertex_buffers(0, draw_call.model.buffer.clone())
                 .draw(draw_call.model.buffer.len() as u32, 1, 0, 0).unwrap();
         }
         builder.end_render_pass().unwrap();
 
         let command_buffer = builder.build().unwrap();
+        self.submit_command_buffer(command_buffer, image_acquire_future, image_index);
+    }
 
+    pub fn build_pipeline(&self, vertex_shader:Arc<ShaderModule>, fragment_shader:Arc<ShaderModule>) -> Arc<GraphicsPipeline>{
+        return GraphicsPipeline::start()
+            .render_pass(Subpass::from(self.render_pass.clone(), 0).unwrap())
+            .vertex_input_state(BuffersDefinition::new().vertex::<Vertex>())
+            .input_assembly_state(InputAssemblyState::new())
+            .vertex_shader(vertex_shader.entry_point("main").unwrap(), ())
+            .fragment_shader(fragment_shader.entry_point("main").unwrap(), ())
+            .viewport_state(ViewportState::viewport_dynamic_scissor_irrelevant())
+            .build(self.device.clone()).unwrap();
+    }
+
+    fn submit_command_buffer(&mut self, command_buffer:PrimaryAutoCommandBuffer, image_acquire_future:SwapchainAcquireFuture, image_index:u32){
         let future = self.previous_frame_end
             .take().unwrap()
             .join(image_acquire_future)

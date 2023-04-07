@@ -1,6 +1,7 @@
 use vulkano::memory::allocator::StandardMemoryAllocator;
 use winit::event::{Event, WindowEvent};
 use winit::event_loop::{ControlFlow, EventLoop};
+use crate::material::Material;
 use crate::renderer::draw_call::DrawCall;
 use crate::renderer::Renderer;
 use crate::renderer::model::{Model, Vertex};
@@ -9,6 +10,7 @@ use crate::transform::Transform;
 
 mod renderer;
 mod transform;
+mod material;
 
 fn main() {
     let event_loop:EventLoop<()> = EventLoop::new();
@@ -47,6 +49,9 @@ fn main() {
     let transform:Transform = Transform::identity();
     let model = Model::load(&memory_allocator, vertices);
     let model2 = Model::load(&memory_allocator, vertices2);
+    let material = Material::new(&renderer,
+   renderer.shader_container.get_shader(ShaderType::Vertex, "direct").expect("Didn't find shader"),
+ renderer.shader_container.get_shader(ShaderType::Fragment, "direct").expect("Didn't find shader"));
 
     //              --END OF DEBUG DATA--              //
 
@@ -70,17 +75,11 @@ fn main() {
                     DrawCall{
                         transform:transform.clone(),
                         model:model.clone(),
-                        vertex_shader:renderer.shader_container
-                            .get_shader(ShaderType::Vertex, "direct").expect("Didn't find shader"),
-                        fragment_shader:renderer.shader_container
-                            .get_shader(ShaderType::Fragment, "direct").expect("Didn't find shader")},
-                  DrawCall{
-                      transform:transform.clone(),
-                      model:model2.clone(),
-                      vertex_shader:renderer.shader_container
-                          .get_shader(ShaderType::Vertex, "direct").expect("Didn't find shader"),
-                      fragment_shader:renderer.shader_container
-                          .get_shader(ShaderType::Fragment, "direct").expect("Didn't find shader")}];
+                        material:material.clone()},
+                    DrawCall{
+                        transform:transform.clone(),
+                        model:model2.clone(),
+                        material:material.clone()}];
 
                 renderer.submit_frame_draw(draw_calls);
             }
