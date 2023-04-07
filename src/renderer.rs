@@ -136,8 +136,7 @@ pub fn initialize_renderer(event_loop:&EventLoop<()>) -> Renderer
             device
                 .physical_device()
                 .surface_formats(&surface, Default::default())
-                .unwrap()[0]
-                .0,
+                .unwrap()[0].0,
         );
 
         let window = surface.object().unwrap().downcast_ref::<Window>().unwrap();
@@ -146,7 +145,8 @@ pub fn initialize_renderer(event_loop:&EventLoop<()>) -> Renderer
             device.clone(),
             surface.clone(),
             SwapchainCreateInfo {
-                min_image_count: surface_capabilities.min_image_count, image_format,
+                min_image_count: surface_capabilities.min_image_count,
+                image_format: image_format,
                 image_extent: window.inner_size().into(),
                 image_usage: ImageUsage {
                     color_attachment: true,
@@ -231,7 +231,7 @@ impl Renderer{
         self.swapchain_container.optimal = false;
     }
 
-    pub fn submit_draw(&mut self, draw_calls:Vec<DrawCall>){
+    pub fn submit_frame_draw(&mut self, draw_calls:Vec<DrawCall>){
         let window = self.render_surface.object().unwrap().downcast_ref::<Window>().unwrap();
         let dimensions = window.inner_size();
         if dimensions.width == 0 || dimensions.height == 0 {
@@ -264,7 +264,7 @@ impl Renderer{
             );
         }
 
-        let (image_index, suboptimal, acquire_future) =
+        let (image_index, suboptimal, image_acquire_future) =
             match acquire_next_image(self.swapchain_container.swapchain.clone(), None) {
                 Ok(r) => r,
                 Err(AcquireError::OutOfDate) => {
@@ -296,19 +296,19 @@ impl Renderer{
             )
             .unwrap()
             .set_viewport(0, [self.viewport.clone()])
-            .bind_pipeline_graphics(self.pipeline.clone())
-            .bind_vertex_buffers(0, draw_calls.first().unwrap().model.buffer.clone())
-            .draw(draw_calls.first().unwrap().model.buffer.len() as u32, 1, 0, 0)
-            .unwrap()
-            .end_render_pass()
-            .unwrap();
+            .bind_pipeline_graphics(self.pipeline.clone());
+        for draw_call in draw_calls {
+            builder
+                .bind_vertex_buffers(0, draw_call.model.buffer.clone())
+                .draw(draw_call.model.buffer.len() as u32, 1, 0, 0).unwrap();
+        }
+        builder.end_render_pass().unwrap();
 
         let command_buffer = builder.build().unwrap();
 
         let future = self.previous_frame_end
-            .take()
-            .unwrap()
-            .join(acquire_future)
+            .take().unwrap()
+            .join(image_acquire_future)
             .then_execute(self.queue.clone(), command_buffer).unwrap()
             .then_swapchain_present(
                 self.queue.clone(),

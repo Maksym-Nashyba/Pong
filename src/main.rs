@@ -15,7 +15,7 @@ fn main() {
     let mut renderer:Renderer = renderer::initialize_renderer(&event_loop);
 
 
-    //              --DATA HERE FOR NOW--
+    //              --DATA HERE FOR NOW--              //
 
     let memory_allocator: StandardMemoryAllocator =
         StandardMemoryAllocator::new_default(renderer.device.clone());
@@ -32,10 +32,23 @@ fn main() {
         },
     ];
 
+    let vertices2 = vec![
+        Vertex {
+            position: [0.0, 1.0, 0.5],
+        },
+        Vertex {
+            position: [1.0, 1.0, 0.5],
+        },
+        Vertex {
+            position: [1.0, 0.0, 0.5],
+        },
+    ];
+
     let transform:Transform = Transform::identity();
     let model = Model::load(&memory_allocator, vertices);
+    let model2 = Model::load(&memory_allocator, vertices2);
 
-    //              --END OF DEBUG DATA--
+    //              --END OF DEBUG DATA--              //
 
 
     event_loop.run(move |event, _, control_flow| {
@@ -53,15 +66,23 @@ fn main() {
                 renderer.on_resized();
             }
             Event::RedrawEventsCleared => {
-                let draw_calls = vec![DrawCall{
-                    transform:transform.clone(),
-                    model:model.clone(),
-                    vertex_shader:renderer.shader_container
-                        .get_shader(ShaderType::Vertex, "direct").expect("Didn't find shader"),
-                    fragment_shader:renderer.shader_container
-                        .get_shader(ShaderType::Fragment, "direct").expect("Didn't find shader")}];
+                let draw_calls = vec![
+                    DrawCall{
+                        transform:transform.clone(),
+                        model:model.clone(),
+                        vertex_shader:renderer.shader_container
+                            .get_shader(ShaderType::Vertex, "direct").expect("Didn't find shader"),
+                        fragment_shader:renderer.shader_container
+                            .get_shader(ShaderType::Fragment, "direct").expect("Didn't find shader")},
+                  DrawCall{
+                      transform:transform.clone(),
+                      model:model2.clone(),
+                      vertex_shader:renderer.shader_container
+                          .get_shader(ShaderType::Vertex, "direct").expect("Didn't find shader"),
+                      fragment_shader:renderer.shader_container
+                          .get_shader(ShaderType::Fragment, "direct").expect("Didn't find shader")}];
 
-                renderer.submit_draw(draw_calls);
+                renderer.submit_frame_draw(draw_calls);
             }
             _ => (),
         }
