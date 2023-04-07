@@ -24,31 +24,36 @@ fn main() {
 
     let vertices = vec![
         Vertex {
-            position: [-0.5, -0.25, 0.5],
+            position: [-0.75, 1.0, 0.5],
         },
         Vertex {
-            position: [0.0, 0.5, 0.5],
+            position: [0.0, -1.0, 0.5],
         },
         Vertex {
-            position: [0.25, -0.1, 0.5],
-        },
-    ];
-
-    let vertices2 = vec![
-        Vertex {
-            position: [0.0, 1.0, 0.5],
+            position: [0.4, 0.0, 0.5],
         },
         Vertex {
-            position: [1.0, 1.0, 0.5],
+            position: [-1.0, -0.5, 0.5],
         },
         Vertex {
-            position: [1.0, 0.0, 0.5],
+            position: [0.2, -0.5, 0.5],
+        },
+        Vertex {
+            position: [0.75, 1.0, 0.5],
+        },
+        Vertex {
+            position: [0.2, -0.5, 0.5],
+        },
+        Vertex {
+            position: [1.0, -0.5, 0.5],
+        },
+        Vertex {
+            position: [0.4, 0.0, 0.5],
         },
     ];
 
     let transform:Transform = Transform::identity();
     let model = Model::load(&memory_allocator, vertices);
-    let model2 = Model::load(&memory_allocator, vertices2);
     let material = Material::new(&renderer,
    renderer.shader_container.get_shader(ShaderType::Vertex, "direct").expect("Didn't find shader"),
  renderer.shader_container.get_shader(ShaderType::Fragment, "direct").expect("Didn't find shader"));
@@ -75,10 +80,6 @@ fn main() {
                     DrawCall{
                         transform:transform.clone(),
                         model:model.clone(),
-                        material:material.clone()},
-                    DrawCall{
-                        transform:transform.clone(),
-                        model:model2.clone(),
                         material:material.clone()}];
 
                 renderer.submit_frame_draw(draw_calls);
