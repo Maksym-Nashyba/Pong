@@ -5,7 +5,7 @@ pub(crate) mod draw_call;
 use std::sync::Arc;
 
 use vulkano::{
-    buffer::{CpuAccessibleBuffer, TypedBufferAccess},
+    buffer::TypedBufferAccess,
     command_buffer::{
         allocator::StandardCommandBufferAllocator, AutoCommandBufferBuilder, CommandBufferUsage,
         RenderPassBeginInfo, SubpassContents,
@@ -15,7 +15,6 @@ use vulkano::{
     },
     image::{ImageAccess, ImageUsage, SwapchainImage, view::ImageView},
     instance::{Instance, InstanceCreateInfo},
-    memory::allocator::StandardMemoryAllocator,
     pipeline::{
         graphics::{
             input_assembly::InputAssemblyState,
@@ -42,8 +41,8 @@ use winit::{
     window::{Window, WindowBuilder},
 };
 use crate::renderer::draw_call::DrawCall;
-use crate::renderer::model::{Model, Vertex};
-use crate::renderer::shader_loader::{ShaderContainer, ShaderType};
+use crate::renderer::model::Vertex;
+use crate::renderer::shader_loader::ShaderContainer;
 
 pub struct Renderer{
     pub device: Arc<Device>,
