@@ -7,9 +7,8 @@ edition = "2021"
 opt-level = 1
 
 [dependencies]
-vulkano = "0.32.3"
-vulkano-win = "0.32.0"
 winit = "0.27"
 bytemuck = "1.13.1"
-vulkano-shaders = "0.32.0"
 nalgebra-glm = { version = "0.17.0", features = ["convert-bytemuck"] }
+obj-rs = "0.6"
+renderer = {git = "https://github.com/Maksym-Nashyba/vulkanus_3d.git"}
