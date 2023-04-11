@@ -11,4 +11,5 @@ winit = "0.27"
 bytemuck = "1.13.1"
 nalgebra-glm = { version = "0.17.0", features = ["convert-bytemuck"] }
 obj-rs = "0.6"
-renderer = {git = "https://github.com/Maksym-Nashyba/vulkanus_3d.git"}
+vulkanus_3d = {git = "https://github.com/Maksym-Nashyba/vulkanus_3d.git"}
+colloider_2d = {git = "https://github.com/WingedCryptid/colloider_2d.git"}
